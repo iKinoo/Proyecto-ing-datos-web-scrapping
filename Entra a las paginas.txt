@@ -1,0 +1,80 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import time
+
+# Función para obtener las noticias de una página
+def get_news(url, mes):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        print(f"❌ Error al acceder a {url}")
+        return []
+    
+    soup = BeautifulSoup(response.text, "html5lib")
+    
+    news_data = []
+    
+    # Depuración: Mostrar una parte del HTML para ver si los artículos están cargando correctamente
+    print(f"🔍 HTML de la página {url}:\n{soup.prettify()[:1000]}\n")
+    
+    # Intentar buscar los artículos de manera más robusta
+    articles = soup.find_all('a', class_='post-headline')
+    
+    if not articles:
+        print(f"⚠ No se encontraron artículos en {mes.capitalize()}")
+    
+    for i, article in enumerate(articles, start=1):
+        try:
+            # Buscar el título
+            title = article.text.strip() if article else "Sin título"
+            
+            # Obtener el enlace (contenido)
+            link = article['href'] if article else "Enlace no encontrado"
+            
+            # Buscar fecha (utilizando otro selector)
+            date_tag = article.find_previous('p', class_='maya')
+            date = date_tag.text.strip() if date_tag else "Sin fecha"
+            
+            # Mostrar datos extraídos para depuración
+            print(f"📅 {mes.capitalize()} - Noticia {i}")
+            print(f"   📰 Título: {title}")
+            print(f"   🗓 Fecha: {date}")
+            print(f"   📄 Enlace: {link}\n")
+            
+            # Añadir al listado de noticias
+            news_data.append({'Fecha': date, 'Título': title, 'Contenido': link})
+        except AttributeError:
+            continue
+    
+    return news_data
+
+# Lista de meses de 2016
+months_2016 = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+]
+
+# URL base
+base_url = "https://www.lajornadamaya.mx/k'iintsil/"
+
+# DataFrame para almacenar todas las noticias
+df = pd.DataFrame(columns=['Fecha', 'Título', 'Contenido'])
+
+# Iterar sobre cada mes de 2016
+for mes in months_2016:
+    url = f"{base_url}{mes}-2016"
+    print(f"🔎 Scrapeando {mes.capitalize()} 2016: {url}")
+    news = get_news(url, mes)
+    print(f"✅ Noticias extraídas en este mes: {len(news)}\n")
+    
+    if news:
+        df = pd.concat([df, pd.DataFrame(news)], ignore_index=True)
+
+    time.sleep(2)
+
+# Guardar en CSV
+df.to_csv("noticias_2016.csv", index=False, encoding='utf-8-sig')
+print("🎉 Scrapeo completado y guardado en 'noticias_2016.csv'")
